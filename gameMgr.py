@@ -79,6 +79,11 @@ class tetris:
         return (self.screen_n_rows*self.screen_n_cols * 2 + 4*4)
     def getNextBlockSize(self):
         return (4*4)
+
+    def copy(self):
+        t = tetris(self.screen_n_rows, self.screen_n_cols)
+        t.setScore(self.score_drop,self.score_eplen,self.score_terminal)
+        return t
     
     def drawBlock(self, blockIdx, blockPos, blockAng):
         temp = np.zeros((self.screen_n_rows, self.screen_n_cols), dtype=np.int32)
