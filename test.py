@@ -35,7 +35,7 @@ def animate(step):
         state_t = state_t_1
 
         # execute action in environment
-        action_t, value = agt.selectNextAction(state_t)
+        action_t, value = agt.selectMaxNextAction(state_t)
         print(value)
         gmm.execute_action(action_t)
 

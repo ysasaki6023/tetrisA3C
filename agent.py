@@ -170,6 +170,10 @@ class agent:
         action_prob, value = self.sess.run([self.pi,self.v], feed_dict = {self.x: [state]})
         return np.random.choice(self.actionList, p=action_prob[0]),value
 
+    def selectMaxNextAction(self, state):
+        action_prob, value = self.sess.run([self.pi,self.v], feed_dict = {self.x: [state]})
+        return self.actionList[np.argmax(action_prob[0])],value
+
     def clearExperience(self):
         self.experience.clear()
         return
