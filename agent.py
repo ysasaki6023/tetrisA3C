@@ -169,6 +169,16 @@ class agent:
 
         return
 
+    def getVars(self):
+        myVar  = []
+        myVar += [self.conv1_w,self.conv1_b]
+        myVar += [self.conv2_w,self.conv2_b]
+        myVar += [self.fc1_w  ,self.fc1_b  ]
+        myVar += [self.fc2_w  ,self.fc2_b  ]
+        myVar += [self.fc_value_w  ,self.fc_value_b  ]
+        myVar += [self.fc_policy_w ,self.fc_policy_b ]
+        return myVar
+
     def selectNextAction(self, state):
         action_prob, value = self.sess.run([self.pi,self.v], feed_dict = {self.x: [state]})
         return np.random.choice(self.actionList, p=action_prob[0]),value

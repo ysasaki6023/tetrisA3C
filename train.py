@@ -32,7 +32,7 @@ if __name__=="__main__":
     rewardDrop_history = collections.deque(maxlen=1000)
     global_agt = agent.agent(global_gmm.getActionList(),global_gmm.getScreenSize(),global_gmm.getNextBlockSize(),n_batch=args.batch_size,learning_rate=args.learn_rate, discountRate=args.discount_rate, saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit)
 
-    if args.reload : agt.load(args.reload)
+    if args.reload : global_agt.load(args.reload)
     if not os.path.exists(args.save_folder): os.makedirs(args.save_folder)
 
     setFile = file(os.path.join(args.save_folder,"settings.dat"),"w")
@@ -75,7 +75,7 @@ if __name__=="__main__":
             if epoch%args.save_freq==0:
                 global_agt.saver.save(global_agt.sess,os.path.join(args.save_folder,"model.ckpt"),epoch)
 
-            print "thread=%d"%thredIndex,"epoch=%5d"%epoch,"length=%3d"%len(agt.experience),"rewardDrop=%2d"%rewardDrop_history[-1],"rewardDrop_max=%2d"%max(rewardDrop_history),"rewardDrop_avg=%.3f"%mean(rewardDrop_history),"reward=%.3f"%reward_history[-1],"reward_avg=%.3f"%mean(reward_history)
+            print "thread=%2d"%thredIndex,"epoch=%5d"%epoch,"length=%3d"%len(agt.experience),"rewardDrop=%2d"%rewardDrop_history[-1],"rewardDrop_max=%2d"%max(rewardDrop_history),"rewardDrop_avg=%.3f"%mean(rewardDrop_history),"reward=%.3f"%reward_history[-1],"reward_avg=%.3f"%mean(reward_history)
         return
 
     #######
