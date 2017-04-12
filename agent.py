@@ -3,7 +3,7 @@ import numpy as np
 import collections,os
 
 class agent:
-    def __init__(self,actionList,inputSize, nextBlockSize,n_batch, learning_rate, discountRate, saveFreq, saveFolder, memoryLimit, device="/gpu:0"):
+    def __init__(self,actionList,inputSize, nextBlockSize,n_batch, learning_rate, discountRate, saveFreq, saveFolder, memoryLimit, thredIndex=-1):
         self.actionList = actionList
         self.n_actions = len(actionList)
         self.n_batch = n_batch
@@ -18,47 +18,11 @@ class agent:
         self.saveModel  = "model.ckpt"
         self.memoryLimit = memoryLimit
         self.entropy_beta = 0.01
-        self.device=device
-        self.thredIndex = -1
+        self.thredIndex = thredIndex
+
 
         self.init_model()
-
         return
-
-    def copySettings(self, global_agt, grad_applier, thredIndex):
-        self.thredIndex=thredIndex
-        self.sync,self.apply_gradients,self.gradients = agt.sync_from(global_agt, grad_applier)
-        #self.sess.run(tf.global_variables_initializer())
-        return
-
-    def sync_from(self, src_netowrk, grad_applier, name=None):
-        src_vars = src_netowrk.get_vars()
-        dst_vars = self.get_vars()
-        sync_ops = []
-
-        with tf.device(self.device):
-            with tf.name_scope(name, "GameACNetwork", []) as name:
-                for(src_var, dst_var) in zip(src_vars, dst_vars):
-                    sync_op = tf.assign(dst_var, src_var)
-                    sync_ops.append(sync_op)
-
-            var_refs = [v._ref() for v in self.get_vars()]
-            gradients = tf.gradients(self.total_loss, var_refs, gate_gradients=False, aggregation_method=None, colocate_gradients_with_ops=False)
-            apply_gradients = grad_applier.apply_gradients( src_netowrk.get_vars(), gradients )
-        print(gradients)
-
-        return tf.group(*sync_ops, name=name), apply_gradients, gradients
-
-    def get_vars(self):
-        myVars  = []
-        myVars += [self.conv1_w, self.conv1_b]
-        myVars += [self.conv2_w, self.conv2_b]
-        myVars += [self.fc1_w  , self.fc1_b  ]
-        myVars += [self.fc2_w  , self.fc2_b  ]
-        myVars += [self.fc_value_w  , self.fc_value_b  ]
-        myVars += [self.fc_policy_w , self.fc_policy_b ]
-
-        return myVars
 
     def leakyReLU(self,x,alpha=0.1):
         return tf.maximum(x*alpha,x)
@@ -90,20 +54,19 @@ class agent:
         return tf.nn.conv2d(x, W, strides = [1, stride, stride, 1], padding = "VALID")
 
     def init_model(self):
-
         scope_name = "net_" + str(self.thredIndex)
-        with tf.device(self.device), tf.variable_scope(scope_name) as scope:
-
+        #with tf.device("/gpu:0"), tf.variable_scope(scope_name) as scope:
+        with tf.variable_scope(scope_name) as scope:
             #############################
             ### input variable definition
-            self.x  = tf.placeholder(tf.float32, [None, self.inputSize[0], self.inputSize[1]])
-            self.a  = tf.placeholder("float", [None, self.n_actions]) # taken action (input for policy)
-            self.td = tf.placeholder("float", [None,1]) # temporary difference (R-V) (input for policy)
-            self.r  = tf.placeholder("float", [None])
-            self.len = tf.placeholder("float", [])
-            self.drop= tf.placeholder("float", [])
-            self.rewardAvg = tf.placeholder("float", [])
-            self.rewardDropAvg = tf.placeholder("float", [])
+            self.x  = tf.placeholder(tf.float32, [None, self.inputSize[0], self.inputSize[1]],name="x")
+            self.a  = tf.placeholder("float", [None, self.n_actions],name="a") # taken action (input for policy)
+            self.td = tf.placeholder("float", [None,1],name="td") # temporary difference (R-V) (input for policy)
+            self.r  = tf.placeholder("float", [None],name="r")
+            self.len = tf.placeholder("float", [],name="len")
+            self.drop= tf.placeholder("float", [],name="drop")
+            self.rewardAvg = tf.placeholder("float", [],name="rewardAvg")
+            self.rewardDropAvg = tf.placeholder("float", [],name="rewardDropAvg")
 
             #############################
             ### network definition
@@ -166,47 +129,44 @@ class agent:
             optimizer = tf.train.RMSPropOptimizer(self.learning_rate)
             self.optimizer = optimizer.minimize(self.total_loss)
 
-        #############################
-        ### summary
-        """
-        tf.summary.scalar("loss_total" ,self.total_loss)
-        tf.summary.scalar("loss_policy",self.policy_loss)
-        tf.summary.scalar("loss_value" ,self.value_loss)
-        tf.summary.scalar("Entropy"    ,tf.reduce_sum(self.entropy))
-        tf.summary.scalar("TD error"   ,tf.nn.l2_loss(self.td))
-        tf.summary.histogram("v"    ,self.v)
-        tf.summary.histogram("pi"   ,self.pi)
-        tf.summary.scalar("length"     ,self.len)
-        tf.summary.scalar("drops"      ,self.drop)
-        tf.summary.scalar("rewardAvg"      ,self.rewardAvg)
-        tf.summary.scalar("rewardDropAvg"  ,self.rewardDropAvg)
-        """
-        tf.summary.histogram("conv1_W"   ,self.conv1_w)
-        tf.summary.histogram("conv1_b"   ,self.conv1_b)
-        tf.summary.histogram("conv2_W"   ,self.conv2_w)
-        tf.summary.histogram("conv2_b"   ,self.conv2_b)
-        tf.summary.histogram("fc1_W"     ,self.fc1_w)
-        tf.summary.histogram("fc1_b"     ,self.fc1_b)
-        tf.summary.histogram("fc2_W"     ,self.fc2_w)
-        tf.summary.histogram("fc2_b"     ,self.fc2_b)
-        tf.summary.histogram("fc_value_W"     ,self.fc_value_w)
-        tf.summary.histogram("fc_value_b"     ,self.fc_value_b)
-        tf.summary.histogram("fc_policy_W"     ,self.fc_policy_w)
-        tf.summary.histogram("fc_policy_b"     ,self.fc_policy_b)
+            #############################
+            ### summary
+            tf.summary.scalar("loss_total" ,self.total_loss)
+            tf.summary.scalar("loss_policy",self.policy_loss)
+            tf.summary.scalar("loss_value" ,self.value_loss)
+            tf.summary.scalar("Entropy"    ,tf.reduce_sum(self.entropy))
+            tf.summary.scalar("TD error"   ,tf.nn.l2_loss(self.td))
+            tf.summary.scalar("length"     ,self.len)
+            tf.summary.scalar("drops"      ,self.drop)
+            tf.summary.scalar("rewardAvg"      ,self.rewardAvg)
+            tf.summary.scalar("rewardDropAvg"  ,self.rewardDropAvg)
+            tf.summary.histogram("v"    ,self.v)
+            tf.summary.histogram("pi"   ,self.pi)
+            tf.summary.histogram("conv1_W"   ,self.conv1_w)
+            tf.summary.histogram("conv1_b"   ,self.conv1_b)
+            tf.summary.histogram("conv2_W"   ,self.conv2_w)
+            tf.summary.histogram("conv2_b"   ,self.conv2_b)
+            tf.summary.histogram("fc1_W"     ,self.fc1_w)
+            tf.summary.histogram("fc1_b"     ,self.fc1_b)
+            tf.summary.histogram("fc2_W"     ,self.fc2_w)
+            tf.summary.histogram("fc2_b"     ,self.fc2_b)
+            tf.summary.histogram("fc_value_W"     ,self.fc_value_w)
+            tf.summary.histogram("fc_value_b"     ,self.fc_value_b)
+            tf.summary.histogram("fc_policy_W"     ,self.fc_policy_w)
+            tf.summary.histogram("fc_policy_b"     ,self.fc_policy_b)
 
-        #############################
-        ### saver
-        self.saver = tf.train.Saver()
-        self.summary = tf.summary.merge_all()
-        if self.saveFolder: self.writer = tf.summary.FileWriter(self.saveFolder)
-        return
+            #############################
+            ### saver
+            self.saver = tf.train.Saver()
+            self.summary = tf.summary.merge_all()
+            if self.saveFolder: self.writer = tf.summary.FileWriter(self.saveFolder)
 
-    def InitSession(self,init=False):
-        #############################
-        ### session
-        config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=self.memoryLimit))
-        self.sess = tf.Session(config=config)
-        self.sess.run(tf.global_variables_initializer())
+            #############################
+            ### session
+            config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=self.memoryLimit))
+            self.sess = tf.Session(config=config)
+            self.sess.run(tf.global_variables_initializer())
+
         return
 
     def selectNextAction(self, state):
@@ -225,7 +185,8 @@ class agent:
         self.experience.append((state_t, self.actionList.index(action), value, state_tp1, reward, terminal))
         return
 
-    def trainFromExperience(self,addSummary=None):
+    def trainFromExperience(self,agt=None,addSummary=None):
+        #if not agt: agt = self
         ######################
         ## Calculation
         batch_x  = []
@@ -242,14 +203,10 @@ class agent:
             batch_a.append(a)
             batch_td.append(td)
             batch_r.append(R)
+
         ######################
         ## Train
-        #_, summary = self.sess.run([self.apply_gradients,self.summary],
-        #                            feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_td, self.r:batch_r, self.len:addSummary["length"],
-        #                                       self.drop:addSummary["rewardDrop"],self.rewardDropAvg:addSummary["rewardDropAvg"],self.rewardAvg:addSummary["rewardAvg"]})
-        _ = self.sess.run(self.apply_gradients,
-                                    feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_td, self.r:batch_r, self.len:addSummary["length"],
-                                               self.drop:addSummary["rewardDrop"],self.rewardDropAvg:addSummary["rewardDropAvg"],self.rewardAvg:addSummary["rewardAvg"]})
+        _, summary = agt.sess.run([agt.optimizer,agt.summary], feed_dict={agt.x:batch_x, agt.a:batch_a, agt.td:batch_td, agt.r:batch_r, agt.len:addSummary["length"],agt.drop:addSummary["rewardDrop"],agt.rewardDropAvg:addSummary["rewardDropAvg"],agt.rewardAvg:addSummary["rewardAvg"]})
 
         return summary
 
