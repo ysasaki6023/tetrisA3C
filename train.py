@@ -1,5 +1,5 @@
 import numpy as np
-import gameMgr,agent
+import gameMgr,agent,time
 import tensorflow as tf
 import argparse,os,csv,threading,collections,signal
 
@@ -30,6 +30,7 @@ if __name__=="__main__":
     write_epoch = 100
     reward_history     = collections.deque(maxlen=1000)
     rewardDrop_history = collections.deque(maxlen=1000)
+    time_history       = collections.deque(maxlen=1000)
     global_agt = agent.agent(global_gmm.getActionList(),global_gmm.getScreenSize(),global_gmm.getNextBlockSize(),n_batch=args.batch_size,learning_rate=args.learn_rate, discountRate=args.discount_rate, saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit)
 
     if args.reload : agt.load(args.reload)
@@ -68,14 +69,16 @@ if __name__=="__main__":
                 rewardDrop_total += rewardDrop
             reward_history.append(reward_total)
             rewardDrop_history.append(rewardDrop_total)
+            time_history.append(time.time())
             # start training
             summary = agt.trainFromExperience(global_agt,addSummary={"rewardDrop":rewardDrop, "length":len(agt.experience), "rewardDropAvg":mean(rewardDrop_history), "rewardAvg":mean(reward_history)})
             if epoch%write_epoch==0:
                 global_agt.writer.add_summary(summary,epoch)
             if epoch%args.save_freq==0:
                 global_agt.saver.save(global_agt.sess,os.path.join(args.save_folder,"model.ckpt"),epoch)
+            avgTime = (time_history[-1]-time_history[0])/len(time_history) * 1000.
 
-            print "thread=%d"%thredIndex,"epoch=%5d"%epoch,"length=%3d"%len(agt.experience),"rewardDrop=%2d"%rewardDrop_history[-1],"rewardDrop_max=%2d"%max(rewardDrop_history),"rewardDrop_avg=%.3f"%mean(rewardDrop_history),"reward=%.3f"%reward_history[-1],"reward_avg=%.3f"%mean(reward_history)
+            print "thread=%d"%thredIndex,"epoch=%5d"%epoch,"length=%3d"%len(agt.experience),"rewardDrop=%2d"%rewardDrop_history[-1],"rewardDrop_max=%2d"%max(rewardDrop_history),"rewardDrop_avg=%.3f"%mean(rewardDrop_history),"reward=%.3f"%reward_history[-1],"reward_avg=%.3f"%mean(reward_history),"avgTime=%.1fs/1000"%avgTime
         return
 
     #######
