@@ -71,6 +71,11 @@ class tetris:
         self.score_terminal= terminal
         return
 
+    def copy(self):
+        t = tetris(self.screen_n_rows, self.screen_n_cols)
+        t.setScore(self.score_drop,self.score_eplen,self.score_terminal)
+        return t
+
     def getActionList(self):
         return self.possible_actions
     def getScreenSize(self):

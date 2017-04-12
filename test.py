@@ -24,7 +24,7 @@ def animate(step):
 
     if terminal:
         gmm.startNewEpoch()
-        print()
+        #print()
 
         # for log
         #win += 1
@@ -35,7 +35,7 @@ def animate(step):
         state_t = state_t_1
 
         # execute action in environment
-        action_t, value = agt.selectNextAction(state_t)
+        action_t, value = agt.selectMaxNextAction(state_t)
         print(value)
         gmm.execute_action(action_t)
 
@@ -63,6 +63,7 @@ if __name__ == "__main__":
     #gmm = gameMgr.tetris(12,6)
     gmm = gameMgr.tetris(20,10)
     agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),n_batch=1,learning_rate=0, discountRate=0, saveFreq=0, saveFolder=None, memoryLimit=0.05)
+    agt.InitSession(True)
     agt.load(args.model_path)
 
     # variables
