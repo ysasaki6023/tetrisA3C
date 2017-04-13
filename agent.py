@@ -126,7 +126,8 @@ class agent:
 
             #############################
             ### optimizer
-            optimizer = tf.train.RMSPropOptimizer(self.learning_rate)
+            #optimizer = tf.train.RMSPropOptimizer(self.learning_rate)
+            optimizer = tf.train.AdamOptimizer(self.learning_rate)
             self.optimizer = optimizer.minimize(self.total_loss)
 
             #############################

@@ -33,7 +33,6 @@ if __name__=="__main__":
     time_history       = collections.deque(maxlen=1000)
     global_agt = agent.agent(global_gmm.getActionList(),global_gmm.getScreenSize(),global_gmm.getNextBlockSize(),n_batch=args.batch_size,learning_rate=args.learn_rate, discountRate=args.discount_rate, saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit)
 
-    if args.reload : global_agt.load(args.reload)
     if not os.path.exists(args.save_folder): os.makedirs(args.save_folder)
 
     setFile = file(os.path.join(args.save_folder,"settings.dat"),"w")
@@ -98,6 +97,7 @@ if __name__=="__main__":
     for i in range(args.nworkers):
         threadList.append(threading.Thread(target=train_function, args=(i,sess)))
     sess.run(tf.global_variables_initializer())
+    if args.reload : global_agt.load(args.reload)
     # set signal handlers
     signal.signal(signal.SIGINT, signal_handler)
 
