@@ -22,6 +22,7 @@ if __name__=="__main__":
     parser.add_argument("--save_folder",type=str,default="model")
     parser.add_argument("--reload",type=str,default=None)
     parser.add_argument("--nworkers",type=int,default=1)
+    parser.add_argument("--nmaxiter",type=int,default=-1)
     args = parser.parse_args()
 
     global_gmm = gameMgr.tetris(20,10)
@@ -50,7 +51,9 @@ if __name__=="__main__":
                           discountRate=args.discount_rate, saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit, thredIndex=thredIndex)
         agt.sess = sess
         while True:
-            if stopFlag: break
+            if stopFlag or (args.nmaxiter>0 and epoch>=args.nmaxiter):
+                os.kill(os.getpid(), signal.SIGINT)
+                break
             epoch  += 1
             gmm.startNewEpoch()
             state_tp1, reward, rewardDrop, _ = gmm.observe()
