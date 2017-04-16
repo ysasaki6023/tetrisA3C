@@ -63,7 +63,8 @@ if __name__=="__main__":
             # start one experiment
             while not terminal:
                 state_t = state_tp1
-                action, value = global_agt.selectNextAction(state_t)
+                #action, value = global_agt.selectNextAction(state_t)
+                action, value = global_agt.selectMaxNextAction(state_t)
                 gmm.execute_action(action)
                 state_tp1, reward, rewardDrop, terminal = gmm.observe()
                 agt.storeExperience(state_t, action, value, state_tp1, reward, terminal)
