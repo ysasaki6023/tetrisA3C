@@ -70,6 +70,10 @@ class tetris:
         self.score_eplen= eplen_bonus
         self.score_terminal= terminal
         return
+    def copy(self):
+        t = tetris(self.screen_n_rows, self.screen_n_cols)
+        t.setScore(self.score_drop,self.score_eplen,self.score_terminal)
+        return t
 
     def getActionList(self):
         return self.possible_actions
@@ -158,8 +162,9 @@ class tetris:
         else:
             reward_drop  = self.reward_adrop * self.score_drop
             self.reward_adrop = 0
-        screen = np.logical_or(piles, block)
-        reward = reward_drop + reward_eplen + reward_terminal
+        screen  = np.logical_or(piles, block).astype(np.int32)
+        screen += block.astype(np.int32)
+        reward  = reward_drop + reward_eplen + reward_terminal
         return screen, reward, reward_drop, self.terminal
 
     def execute_action(self, action):
