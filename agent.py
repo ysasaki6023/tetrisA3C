@@ -62,13 +62,13 @@ class agent:
             #############################
             ### input variable definition
             self.x  = tf.placeholder(tf.float32, [self.nBatch, self.timeStep, self.inputSize[0], self.inputSize[1]],name="x")
-            self.a  = tf.placeholder("float", [self.nBatch, self.timeStep, self.n_actions],name="a") # taken action (input for policy)
-            self.td = tf.placeholder("float", [self.nBatch, self.timeStep],name="td") # temporary difference (R-V) (input for policy)
-            self.r  = tf.placeholder("float", [self.nBatch, self.timeStep],name="r")
-            self.len = tf.placeholder("float", [],name="len")
-            self.drop= tf.placeholder("float", [],name="drop")
-            self.rewardAvg = tf.placeholder("float", [],name="rewardAvg")
-            self.rewardDropAvg = tf.placeholder("float", [],name="rewardDropAvg")
+            self.a  = tf.placeholder(tf.float32, [self.nBatch, self.timeStep, self.n_actions],name="a") # taken action (input for policy)
+            self.td = tf.placeholder(tf.float32, [self.nBatch, self.timeStep],name="td") # temporary difference (R-V) (input for policy)
+            self.r  = tf.placeholder(tf.float32, [self.nBatch, self.timeStep],name="r")
+            self.len = tf.placeholder(tf.float32, [],name="len")
+            self.drop= tf.placeholder(tf.float32, [],name="drop")
+            self.rewardAvg = tf.placeholder(tf.float32, [],name="rewardAvg")
+            self.rewardDropAvg = tf.placeholder(tf.float32, [],name="rewardDropAvg")
 
             # start
             h = self.x
@@ -262,8 +262,6 @@ class agent:
 
         ######################
         ## Train
-        #self.sess.run(self.optimizer, feed_dict={self.x:batch_x})
-        #_,summary = self.sess.run([self.optimizer,self.summary], feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_d, self.r:batch_r, self.initial_lstm_state: np.zeros((self.nBatch, 256*2)) })
         _, summary = self.sess.run([self.optimizer,self.summary],
                                     feed_dict={self.x:batch_x, 
                                                self.a:batch_a, 
