@@ -3,7 +3,7 @@ import numpy as np
 import collections,os
 
 class agent:
-    def __init__(self, actionList, inputSize, nextBlockSize, nBatch, timeStep, learning_rate, discountRate, saveFreq, saveFolder, memoryLimit):
+    def __init__(self, actionList, inputSize, nextBlockSize, nBatch, timeStep, learning_rate, discountRate, saveFreq, softTemp, saveFolder, memoryLimit):
         self.actionList = actionList
         self.n_actions = len(actionList)
         self.nBatch = nBatch
@@ -19,6 +19,7 @@ class agent:
         self.memoryLimit = memoryLimit
         self.entropy_beta = 0.01
         self.timeStep = timeStep
+        self.softTemp = softTemp
 
         self.init_model()
         return
@@ -69,29 +70,39 @@ class agent:
             self.rewardAvg = tf.placeholder("float", [],name="rewardAvg")
             self.rewardDropAvg = tf.placeholder("float", [],name="rewardDropAvg")
 
+            # start
             h = self.x
 
+            h = tf.reshape(h,(self.nBatch*self.timeStep,self.inputSize[0],self.inputSize[1]))
+
             # conv1
-            #h = tf.expand_dims(h,axis=3)
-            #sb, sh, sw, sf = h.get_shape()
-            #self.conv1_w, self.conv1_b = self._conv_variable([3,3,1,32])
-            #h = self._conv2d(h, self.conv1_w, stride=1) + self.conv1_b
-            #h = self.leakyReLU(h)
+            h = tf.expand_dims(h,axis=3)
+            self.conv1_w, self.conv1_b = self._conv_variable([3,3,1,32])
+            h = self._conv2d(h, self.conv1_w, stride=1) + self.conv1_b
+            h = self.leakyReLU(h)
+
+            # conv2
+            self.conv2_w, self.conv2_b = self._conv_variable([3,3,32,64])
+            h = self._conv2d(h, self.conv2_w, stride=1) + self.conv2_b
+            h = self.leakyReLU(h)
+
+            # conv3
+            self.conv3_w, self.conv3_b = self._conv_variable([3,3,64,128])
+            h = self._conv2d(h, self.conv3_w, stride=1) + self.conv3_b
+            h = self.leakyReLU(h)
 
             # fc1
-            h = tf.reshape(h,[self.nBatch * self.timeStep, self.inputSize[0] * self.inputSize[1]])
-            self.fc1_w, self.fc1_b = self._fc_variable([self.inputSize[0] * self.inputSize[1], 256])
+            _,sh,sw,sf = [int(a) for a in h.get_shape()]
+            h = tf.reshape(h,[self.nBatch * self.timeStep, sh*sw*sf])
+            self.fc1_w, self.fc1_b = self._fc_variable([sh*sw*sf, 256])
             h = tf.matmul(h, self.fc1_w) + self.fc1_b
             h = self.leakyReLU(h)
-            h = tf.reshape(h,[self.nBatch , self.timeStep, 256])
 
-            self.lstm = tf.contrib.rnn.BasicLSTMCell(256, state_is_tuple=True)
-            self.initial_lstm_state0 = tf.placeholder(tf.float32, [self.nBatch, 256])
-            self.initial_lstm_state1 = tf.placeholder(tf.float32, [self.nBatch, 256])
-            self.initial_lstm_state  = tf.contrib.rnn.LSTMStateTuple(self.initial_lstm_state0, self.initial_lstm_state1)
-            lstm_outputs, self.lstm_state = tf.nn.rnn(self.lstm, h, initial_state = self.initial_lstm_state, sequence_length = self.step_size, time_major = False, scope = scope)
-            h = lstm_outputs
-            print(h.get_shape())
+            # LSTM
+            h = tf.reshape(h,[self.nBatch , self.timeStep, 256])
+            self.lstm = tf.contrib.rnn.BasicLSTMCell(256, state_is_tuple=False)
+            self.initial_lstm_state = tf.placeholder(tf.float32, [self.nBatch, 256*2])
+            lstm_outputs, self.lstm_state = tf.nn.dynamic_rnn(self.lstm, h, initial_state = self.initial_lstm_state, time_major = False, scope=scope)
 
             # fc_value
             hv = h
@@ -128,29 +139,29 @@ class agent:
 
             #############################
             ### summary
-            #tf.summary.scalar("loss_total" ,self.total_loss)
-            #tf.summary.scalar("loss_policy",self.policy_loss)
-            #tf.summary.scalar("loss_value" ,self.value_loss)
-            #tf.summary.scalar("Entropy"    ,tf.reduce_sum(self.entropy))
-            #tf.summary.scalar("TD error"   ,tf.nn.l2_loss(self.td))
-            #tf.summary.scalar("length"     ,self.len)
-            #tf.summary.scalar("drops"      ,self.drop)
-            #tf.summary.scalar("rewardAvg"      ,self.rewardAvg)
-            #tf.summary.scalar("rewardDropAvg"  ,self.rewardDropAvg)
-            #tf.summary.histogram("v"    ,self.v)
-            #tf.summary.histogram("pi"   ,self.pi)
-            #tf.summary.histogram("conv1_W"   ,self.conv1_w)
-            #tf.summary.histogram("conv1_b"   ,self.conv1_b)
-            #tf.summary.histogram("conv2_W"   ,self.conv2_w)
-            #tf.summary.histogram("conv2_b"   ,self.conv2_b)
-            #tf.summary.histogram("fc1_W"     ,self.fc1_w)
-            #tf.summary.histogram("fc1_b"     ,self.fc1_b)
-            #tf.summary.histogram("fc2_W"     ,self.fc2_w)
-            #tf.summary.histogram("fc2_b"     ,self.fc2_b)
-            #tf.summary.histogram("fc_value_W"     ,self.fc_value_w)
-            #tf.summary.histogram("fc_value_b"     ,self.fc_value_b)
-            #tf.summary.histogram("fc_policy_W"     ,self.fc_policy_w)
-            #tf.summary.histogram("fc_policy_b"     ,self.fc_policy_b)
+            tf.summary.scalar("loss_total" ,self.total_loss)
+            tf.summary.scalar("loss_policy",self.policy_loss)
+            tf.summary.scalar("loss_value" ,self.value_loss)
+            tf.summary.scalar("Entropy"    ,tf.reduce_sum(self.entropy))
+            tf.summary.scalar("TD error"   ,tf.nn.l2_loss(self.td))
+            tf.summary.scalar("length"     ,self.len)
+            tf.summary.scalar("drops"      ,self.drop)
+            tf.summary.scalar("rewardAvg"      ,self.rewardAvg)
+            tf.summary.scalar("rewardDropAvg"  ,self.rewardDropAvg)
+            tf.summary.histogram("v"    ,self.v)
+            tf.summary.histogram("pi"   ,self.pi)
+            tf.summary.histogram("conv1_W"   ,self.conv1_w)
+            tf.summary.histogram("conv1_b"   ,self.conv1_b)
+            tf.summary.histogram("conv2_W"   ,self.conv2_w)
+            tf.summary.histogram("conv2_b"   ,self.conv2_b)
+            tf.summary.histogram("conv3_W"   ,self.conv3_w)
+            tf.summary.histogram("conv3_b"   ,self.conv3_b)
+            tf.summary.histogram("fc1_W"     ,self.fc1_w)
+            tf.summary.histogram("fc1_b"     ,self.fc1_b)
+            tf.summary.histogram("fc_value_W"     ,self.fc_value_w)
+            tf.summary.histogram("fc_value_b"     ,self.fc_value_b)
+            tf.summary.histogram("fc_policy_W"     ,self.fc_policy_w)
+            tf.summary.histogram("fc_policy_b"     ,self.fc_policy_b)
 
         #############################
         ### saver
@@ -177,7 +188,7 @@ class agent:
         # xx : (b, s, h, w)
         for i, xItem in enumerate(x):
             xx[0,i,:,:] = xItem
-        policy, value = self.sess.run([self.policy,self.v], feed_dict = {self.x: xx})
+        policy, value = self.sess.run([self.policy,self.v], feed_dict = {self.x: xx, self.initial_lstm_state: np.zeros((self.nBatch, 256*2))})
         policy, value = policy[0,len(x)-1], value[0,len(x)-1]
         action_prob = self.SoftMaxWithTemp(policy,T)
         return np.random.choice(self.actionList, p=action_prob),value
@@ -252,8 +263,17 @@ class agent:
         ######################
         ## Train
         #self.sess.run(self.optimizer, feed_dict={self.x:batch_x})
-        summary = self.sess.run(self.optimizer, feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_d, self.r:batch_r})
-        #_, summary = self.sess.run([self.optimizer,self.summary], feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_d, self.r:batch_r, self.len:addSummary["length"],self.drop:addSummary["rewardDrop"],self.rewardDropAvg:addSummary["rewardDropAvg"],self.rewardAvg:addSummary["rewardAvg"]})
+        #_,summary = self.sess.run([self.optimizer,self.summary], feed_dict={self.x:batch_x, self.a:batch_a, self.td:batch_d, self.r:batch_r, self.initial_lstm_state: np.zeros((self.nBatch, 256*2)) })
+        _, summary = self.sess.run([self.optimizer,self.summary],
+                                    feed_dict={self.x:batch_x, 
+                                               self.a:batch_a, 
+                                               self.td:batch_d, 
+                                               self.r:batch_r, 
+                                               self.initial_lstm_state: np.zeros((self.nBatch, 256*2)),
+                                               self.len:addSummary["length"],
+                                               self.drop:addSummary["rewardDrop"],
+                                               self.rewardDropAvg:addSummary["rewardDropAvg"],
+                                               self.rewardAvg:addSummary["rewardAvg"]})
 
         return summary
 

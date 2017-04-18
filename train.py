@@ -12,17 +12,18 @@ showInterval = -1
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size",type=int,default=21)
+    parser.add_argument("--batch_size",type=int,default=10)
     parser.add_argument("--memory_limit",type=float,default=0.2)
-    parser.add_argument("--learn_rate",type=float,default=1e-3)
+    parser.add_argument("--learn_rate",type=float,default=1e-4)
     parser.add_argument("--eplen_bonus",type=float,default=0) # reward on the episode length
     parser.add_argument("--discount_rate",type=float,default=0.99)
     parser.add_argument("--replay_size",type=int,default=10000)
     parser.add_argument("--exploration",type=float,default=0.2)
+    parser.add_argument("--soft_temp",type=float,default=1.0)
     parser.add_argument("--save_freq",type=int,default=100)
     parser.add_argument("--save_folder",type=str,default="model")
     parser.add_argument("--reload",type=str,default=None)
-    parser.add_argument("--timeStep",type=int,default=15)
+    parser.add_argument("--timeStep",type=int,default=40)
     args = parser.parse_args()
 
     gmm = gameMgr.tetris(20,10)
@@ -31,7 +32,7 @@ if __name__=="__main__":
     write_epoch = 100
     reward_history     = collections.deque(maxlen=1000)
     rewardDrop_history = collections.deque(maxlen=1000)
-    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),nBatch=args.batch_size,timeStep=args.timeStep,learning_rate=args.learn_rate, discountRate=args.discount_rate, saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit)
+    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),nBatch=args.batch_size,timeStep=args.timeStep,learning_rate=args.learn_rate, discountRate=args.discount_rate, softTemp=args.soft_temp,saveFreq=args.save_freq, saveFolder=args.save_folder, memoryLimit=args.memory_limit)
 
     if args.reload : agt.load(args.reload)
     if not os.path.exists(args.save_folder): os.makedirs(args.save_freq)
@@ -55,7 +56,7 @@ if __name__=="__main__":
         while not terminal:
             state_t = state_tp1
             state_history.append(state_t)
-            action, value = agt.selectNextAction(state_history)
+            action, value = agt.selectNextAction(state_history,T=args.soft_temp)
             gmm.execute_action(action)
             state_tp1, reward, rewardDrop, terminal = gmm.observe()
             agt.storeExperience(state_t, action, value, state_tp1, reward, terminal)
