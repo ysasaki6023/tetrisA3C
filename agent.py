@@ -194,16 +194,12 @@ class agent:
         return np.random.choice(self.actionList, p=action_prob),value
 
     def selectNextMaxAction(self, x, prev_lstm_state=None):
-        # x  : (s, h, w)
-        xx = np.zeros((self.nBatch, self.timeStep, self.inputSize[0], self.inputSize[1]),dtype=np.float32)
         # xx : (b, s, h, w)
-        #for i, xItem in enumerate(x):
-        #    xx[0,i,:,:] = xItem
+        xx = np.zeros((self.nBatch, self.timeStep, self.inputSize[0], self.inputSize[1]),dtype=np.float32)
         xx[0,0,:,:] = x[0]
         if type(prev_lstm_state)==type(None) : initState = np.zeros((self.nBatch, 256*2))
         else                                 : initState = prev_lstm_state
         policy, value, state = self.sess.run([self.policy,self.v,self.lstm_state], feed_dict = {self.x: xx, self.initial_lstm_state: initState})
-        print(state)
         policy, value = policy[0,len(x)-1], value[0,len(x)-1]
         action_prob = self.SoftMaxWithTemp(policy,T=1.)
         return self.actionList[np.argmax(action_prob)],value,state
