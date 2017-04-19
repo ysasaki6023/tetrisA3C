@@ -9,10 +9,11 @@ import matplotlib.pyplot as plt
 import gameMgr
 import agent
 import train
+import collections
 
 
 def init():
-    img.set_array(state_t_1)
+    img.set_array(state_tp1)
     plt.axis("off")
     return img,
 
@@ -20,32 +21,27 @@ def init():
 def animate(step):
     global win, lose
     global agt
-    global state_t_1, reward_t, terminal
+    global state_tp1, reward_t, terminal
+    global softTemp
+    global lstm_state
 
     if terminal:
         gmm.startNewEpoch()
         print()
 
-        # for log
-        #win += 1
-
-        #print("WIN: {:03d}/{:03d} ({:.1f}%)".format(win, win + lose, 100 * win / (win + lose)))
-
     else:
-        state_t = state_t_1
+        state_t = state_tp1
 
         # execute action in environment
-        action_t, value = agt.selectMaxNextAction(state_t)
+        action_t, value, lstm_state = agt.selectNextMaxAction([state_t],prev_lstm_state=None)
         print(value)
         gmm.execute_action(action_t)
 
     # observe environment
-    state_t_1, reward_t, rewardDrop, terminal = gmm.observe()
-    #screen = all_state_t_1[0] + all_state_t_1[1]
-    #state_t_1 = train.flatten(all_state_t_1)
+    state_tp1, reward_t, rewardDrop, terminal = gmm.observe()
 
     # animate
-    img.set_array(state_t_1)
+    img.set_array(state_tp1)
     plt.axis("off")
     return img,
 
@@ -59,22 +55,29 @@ if __name__ == "__main__":
     parser.set_defaults(save=False)
     args = parser.parse_args()
 
+    # parse
+    dirpath = os.path.dirname(args.model_path)
+    fcont = file(os.path.join(dirpath,"settings.dat"),"r")
+    cont  = fcont.readline()
+    cont  = cont.replace("Namespace","").replace("=",":").replace("(","{'").replace(")","}").replace(":","':").replace(", ",", '")
+    cont  = eval(cont)
+    print(cont)
+
     # environmet, agent
-    #gmm = gameMgr.tetris(12,6)
+    lstm_state = None
+    softTemp = 1e-20
     gmm = gameMgr.tetris(20,10)
-    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),n_batch=1,learning_rate=0, discountRate=0, saveFreq=0, saveFolder=None, memoryLimit=0.05)
+    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),nBatch=1,timeStep=1,learning_rate=0, discountRate=0, saveFreq=0, softTemp=softTemp, saveFolder=None, memoryLimit=0.05)
     agt.load(args.model_path)
 
     # variables
     win, lose = 0, 0
-    state_t_1, reward_t, rewardDrop, terminal = gmm.observe()
-    #screen = all_state_t_1[0] + all_state_t_1[1]
-    #state_t_1 = train.flatten(all_state_t_1)
+    state_tp1, reward_t, rewardDrop, terminal = gmm.observe()
 
     # animate
     fig = plt.figure(figsize=(gmm.getScreenSize()[0]/2,gmm.getScreenSize()[1]/2))
     fig.canvas.set_window_title("TeTris")
-    img = plt.imshow(state_t_1, interpolation="none", cmap="gray")
+    img = plt.imshow(state_tp1, interpolation="none", cmap="gray")
     ani = animation.FuncAnimation(fig, animate, init_func=init, interval=(1000 / frame_rate), blit=True)
 
     plt.show()
