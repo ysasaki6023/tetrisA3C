@@ -130,7 +130,10 @@ class agent:
             self.policy_loss = -tf.reduce_mean( tf.reduce_sum( tf.multiply( self.log_pi, self.a ), reduction_indices=2 ) * self.td + self.entropy * self.entropy_beta )
             self.value_loss  = 0.5 * tf.reduce_mean(tf.multiply(self.r-self.v,self.r-self.v)/2.)
 
-            self.total_loss = self.policy_loss + self.value_loss
+            self.l2_loss     = 1e-10 * (   tf.nn.l2_loss(self.conv1_w) + tf.nn.l2_loss(self.conv2_w)    + tf.nn.l2_loss(self.conv3_w)
+                                         + tf.nn.l2_loss(self.fc1_w)   + tf.nn.l2_loss(self.fc_value_w) + tf.nn.l2_loss(self.fc_policy_w) )
+
+            self.total_loss = self.policy_loss + self.value_loss + self.l2_loss
 
             #############################
             ### optimizer
@@ -142,6 +145,7 @@ class agent:
             tf.summary.scalar("loss_total" ,self.total_loss)
             tf.summary.scalar("loss_policy",self.policy_loss)
             tf.summary.scalar("loss_value" ,self.value_loss)
+            tf.summary.scalar("loss_l2"    ,self.l2_loss)
             tf.summary.scalar("Entropy"    ,tf.reduce_sum(self.entropy))
             tf.summary.scalar("TD error"   ,tf.nn.l2_loss(self.td))
             tf.summary.scalar("length"     ,self.len)
@@ -237,11 +241,6 @@ class agent:
 
         batch_v = self.calculateValue(temp_x)
 
-        for i in range(len(batchIdx)):
-            idx = batchIdx[i] + self.timeStep + 1 # +1 is really important
-            if idx >= len(self.experience) :
-                batch_v[i] = 0.
-
         ## Prepare Batch
         batch_x  = np.zeros((self.nBatch, self.timeStep, self.inputSize[0], self.inputSize[1]), dtype=np.float32)
         batch_a  = np.zeros((self.nBatch, self.timeStep, self.n_actions), dtype=np.float32)
@@ -262,10 +261,11 @@ class agent:
                 a = np.zeros([self.n_actions])
                 a[action] = 1
 
-                batch_x [i,j,:,:] = state_t
-                batch_a [i,j,:]   = a
-                batch_d [i,j]     = td
-                batch_r [i,j]     = R
+                invJ = self.timeStep - j - 1
+                batch_x [i,invJ,:,:] = state_t
+                batch_a [i,invJ,:]   = a
+                batch_d [i,invJ]     = td
+                batch_r [i,invJ]     = R
 
         ######################
         ## Train
