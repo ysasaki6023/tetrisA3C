@@ -5,6 +5,7 @@ import os
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
+import numpy as np
 
 import gameMgr
 import agent
@@ -22,28 +23,38 @@ def animate(step):
     global win, lose, totCount, doSave
     global agt
     global state_tp1, reward_t, terminal
-    global softTemp
+    global softTemp, timeStep
     global lstm_state
+    global state_history
+    global score, length, avg_score, avg_length
 
     if doSave:
         if totCount<0: return
         totCount -= 1
 
-
     if terminal:
+        avg_score.append(score)
+        avg_length.append(length)
+        print "game over: length=%d, score=%d    avg(length)=%.1f avg(score)=%.3f"%(length,score,np.mean(avg_length),np.mean(avg_score))
+        score = 0
+        length = 0
         gmm.startNewEpoch()
-        print()
 
     else:
         state_t = state_tp1
+        state_history.append(state_t)
 
         # execute action in environment
         action_t, value, lstm_state = agt.selectNextMaxAction([state_t],prev_lstm_state=lstm_state)
-        print(value)
+        #action_t, value, lstm_state = agt.selectNextMaxAction(state_history,prev_lstm_state=lstm_state)
+        #action_t, value = agt.selectNextAction(state_history,T=1e-10)
+        #print(value)
         gmm.execute_action(action_t)
 
     # observe environment
     state_tp1, reward_t, rewardDrop, terminal = gmm.observe()
+    length += 1
+    score  += rewardDrop
 
     # animate
     img.set_array(state_tp1)
@@ -72,9 +83,13 @@ if __name__ == "__main__":
 
     # environmet, agent
     lstm_state = None
-    softTemp = 1e-20
+    score, length = 0,0
+    avg_score, avg_length = collections.deque(maxlen=1000), collections.deque(maxlen=1000)
+    #softTemp = 1e-20
+    softTemp = cont["soft_temp"]
+    timeStep = cont["timeStep"]
     gmm = gameMgr.tetris(20,10)
-    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),nBatch=1,timeStep=1,learning_rate=0, discountRate=0, saveFreq=0, softTemp=softTemp, saveFolder=None, memoryLimit=0.05)
+    agt = agent.agent(gmm.getActionList(),gmm.getScreenSize(),gmm.getNextBlockSize(),nBatch=1,timeStep=timeStep,learning_rate=0, discountRate=0, saveFreq=0, softTemp=softTemp, saveFolder=None, memoryLimit=0.05)
     agt.load(args.model_path)
 
     # variables
@@ -82,6 +97,7 @@ if __name__ == "__main__":
     state_tp1, reward_t, rewardDrop, terminal = gmm.observe()
     totCount = args.logLength
     doSave = args.save
+    state_history = collections.deque(maxlen=timeStep)
 
     # animate
     fig = plt.figure(figsize=(gmm.getScreenSize()[0]/2,gmm.getScreenSize()[1]/2))
