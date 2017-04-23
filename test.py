@@ -19,11 +19,16 @@ def init():
 
 
 def animate(step):
-    global win, lose
+    global win, lose, totCount, doSave
     global agt
     global state_tp1, reward_t, terminal
     global softTemp
     global lstm_state
+
+    if doSave:
+        if totCount<0: return
+        totCount -= 1
+
 
     if terminal:
         gmm.startNewEpoch()
@@ -33,7 +38,7 @@ def animate(step):
         state_t = state_tp1
 
         # execute action in environment
-        action_t, value, lstm_state = agt.selectNextMaxAction([state_t],prev_lstm_state=None)
+        action_t, value, lstm_state = agt.selectNextMaxAction([state_t],prev_lstm_state=lstm_state)
         print(value)
         gmm.execute_action(action_t)
 
@@ -43,6 +48,7 @@ def animate(step):
     # animate
     img.set_array(state_tp1)
     plt.axis("off")
+
     return img,
 
 
@@ -51,8 +57,9 @@ if __name__ == "__main__":
     frame_rate = 20
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model_path")
-    parser.add_argument("-s", "--save", dest="save", action="store_true")
-    parser.set_defaults(save=False)
+    parser.add_argument("-s", "--save", dest="save",default=False)
+    parser.add_argument("-n", "--logLength", dest="logLength",default=1000,type=int)
+    #parser.set_defaults(save=False)
     args = parser.parse_args()
 
     # parse
@@ -73,11 +80,19 @@ if __name__ == "__main__":
     # variables
     win, lose = 0, 0
     state_tp1, reward_t, rewardDrop, terminal = gmm.observe()
+    totCount = args.logLength
+    doSave = args.save
 
     # animate
     fig = plt.figure(figsize=(gmm.getScreenSize()[0]/2,gmm.getScreenSize()[1]/2))
     fig.canvas.set_window_title("TeTris")
     img = plt.imshow(state_tp1, interpolation="none", cmap="gray")
     ani = animation.FuncAnimation(fig, animate, init_func=init, interval=(1000 / frame_rate), blit=True)
+
+    if args.save:
+        ani = animation.FuncAnimation(fig, animate, init_func=init, interval=(1000 / frame_rate), blit=True,save_count=args.logLength)
+        Writer = animation.writers['ffmpeg']
+        writer = Writer(fps=30, metadata=dict(artist='Yuichi Sasaki',title="tetris A3C"))
+        ani.save(args.save+".mp4", writer=writer)
 
     plt.show()
